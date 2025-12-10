@@ -43,9 +43,9 @@ public class NoteControllerImplV1 implements NoteController {
     }
 
     @Override
-    public ResponseEntity<NoteDTO> deleteNote(Long id) {
-        NoteDTO noteDTO = mapper.toNoteDTO(noteService.deleteNote(id));
-        return new ResponseEntity<>(noteDTO, HttpStatus.OK);
+    public ResponseEntity<?> deleteNote(Long id) {
+        noteService.deleteNote(id);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @Override

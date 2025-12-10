@@ -8,7 +8,13 @@ import org.springframework.stereotype.Component;
 public class NoteMapper {
 
     public NoteDTO toNoteDTO(Note note) {
-        return null; //todo
+        return NoteDTO.builder()
+                .id(note.getId())
+                .title(note.getTitle())
+                .content(note.getContent())
+                .updatedAt(note.getUpdatedAt())
+                .createdAt(note.getCreatedAt())
+                .build();
     }
 
 }

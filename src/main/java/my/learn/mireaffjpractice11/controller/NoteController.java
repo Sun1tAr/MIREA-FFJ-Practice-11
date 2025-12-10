@@ -23,7 +23,7 @@ public interface NoteController extends HealthController {
     ResponseEntity<NoteDTO> putNote(@RequestBody @Valid PutNoteRequest putNoteRequest, @PathVariable(name = "id") Long id);
 
     @DeleteMapping("/{id}")
-    ResponseEntity<NoteDTO> deleteNote(@PathVariable(name = "id") Long id);
+    ResponseEntity<?> deleteNote(@PathVariable(name = "id") Long id);
 
     @GetMapping("/")
     ResponseEntity<List<NoteDTO>> getAllNotes();

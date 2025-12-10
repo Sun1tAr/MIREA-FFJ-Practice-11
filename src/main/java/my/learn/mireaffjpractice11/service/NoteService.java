@@ -12,7 +12,7 @@ public interface NoteService {
     Note addNote(CreateNoteRequest request);
     Note patchNote(PatchNoteRequest req, Long id);
     Note putNote(PutNoteRequest req, Long id);
-    Note deleteNote(Long id);
+    void deleteNote(Long id);
     List<Note> getAllNotes();
     Note findById(Long id);
 

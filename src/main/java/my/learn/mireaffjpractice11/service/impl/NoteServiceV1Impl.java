@@ -1,18 +1,25 @@
 package my.learn.mireaffjpractice11.service.impl;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import my.learn.mireaffjpractice11.DTO.request.CreateNoteRequest;
 import my.learn.mireaffjpractice11.DTO.request.PatchNoteRequest;
 import my.learn.mireaffjpractice11.DTO.request.PutNoteRequest;
 import my.learn.mireaffjpractice11.entity.Note;
+import my.learn.mireaffjpractice11.exception.ConflictException;
+import my.learn.mireaffjpractice11.exception.NotFoundException;
 import my.learn.mireaffjpractice11.repository.NoteRepository;
 import my.learn.mireaffjpractice11.service.NoteService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class NoteServiceV1Impl  implements NoteService {
 
     private final NoteRepository noteRepository;
@@ -20,31 +27,70 @@ public class NoteServiceV1Impl  implements NoteService {
 
     @Override
     public Note addNote(CreateNoteRequest request) {
-        return null;
+        Note note = Note.builder()
+                .title(request.getTitle())
+                .content(request.getContent())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        try {
+            return noteRepository.save(note);
+        } catch (Exception e) {
+            throw new ConflictException(e.getMessage());
+        }
     }
 
     @Override
     public Note patchNote(PatchNoteRequest req, Long id) {
-        return null;
+        Note note = findById(id);
+        req.getFields().forEach((field,value)->{
+            switch (field) {
+                case "title": note.setTitle(req.getFields().get(field).toString());
+                break;
+                case "content": note.setContent(req.getFields().get(field).toString());
+                break;
+            }
+        });
+        note.setUpdatedAt(LocalDateTime.now());
+        return noteRepository.save(note);
     }
 
     @Override
     public Note putNote(PutNoteRequest req, Long id) {
-        return null;
+        Note note = findById(id);
+        
+        note = Note.builder()
+                .title(req.getTitle())
+                .content(req.getContent())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        try {
+            return noteRepository.save(note);
+        } catch (Exception e) {
+            throw new ConflictException(e.getMessage());
+        }
     }
 
     @Override
-    public Note deleteNote(Long id) {
-        return null;
+    public void deleteNote(Long id) {
+        try {
+            noteRepository.deleteById(id);
+        } catch (Exception e) {
+            throw new NotFoundException("Note with id " + id + " not found");
+        }
     }
 
     @Override
     public List<Note> getAllNotes() {
-        return List.of();
+        return noteRepository.findAll();
     }
 
     @Override
     public Note findById(Long id) {
-        return null;
+        Optional<Note> noteOptional = noteRepository.findById(id);
+        if (noteOptional.isEmpty()) {
+            throw new NotFoundException("Note with id " + id + " not found");
+        }
+        return noteOptional.get();
     }
 }

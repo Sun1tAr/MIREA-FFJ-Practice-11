@@ -1,7 +1,14 @@
 package my.learn.mireaffjpractice11.repository;
 
-import my.learn.mireaffjpractice11.DTO.response.NoteDTO;
+import jakarta.validation.constraints.NotNull;
+import my.learn.mireaffjpractice11.entity.Note;
 import org.springframework.data.repository.CrudRepository;
 
-public interface NoteRepository extends CrudRepository<NoteDTO,Long> {
+import java.util.List;
+
+public interface NoteRepository extends CrudRepository<Note,Long> {
+
+    @NotNull
+    List<Note> findAll();
+
 }
