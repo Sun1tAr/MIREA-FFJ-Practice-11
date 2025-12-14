@@ -13,10 +13,9 @@ import java.util.Date;
 @AllArgsConstructor
 public class JWToken {
 
-    private String payload;
+    private String token;
     private TokenType tokenType;
     private Date issuedAt;
     private Date expiresAt;
-
 
 }

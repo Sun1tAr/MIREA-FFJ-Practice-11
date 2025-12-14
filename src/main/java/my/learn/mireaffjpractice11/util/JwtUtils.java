@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
+import my.learn.mireaffjpractice11.entity.UserAuth;
 import my.learn.mireaffjpractice11.exception.JWTException;
 import my.learn.mireaffjpractice11.model.TokenType;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,16 +20,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JwtUtils {
 
-    private final SecretKey secretKey;
 
-    public String generateToken(UserDetails userDetails,
+    public String generateToken(UserAuth userDetails,
                                 Date issuedAt,
                                 Date expiresAt,
-                                TokenType tokenType) {
+                                TokenType tokenType,
+                                SecretKey secretKey) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("iat", issuedAt.getTime());
         claims.put("exp", expiresAt.getTime());
         claims.put("ath", userDetails.getAuthorities());
+        claims.put("sid", userDetails.getId());
         claims.put("type", tokenType.toString());
 
         return Jwts.builder()
@@ -40,34 +42,39 @@ public class JwtUtils {
                 .compact();
     }
 
-    private Claims getClaimsFromToken(String token) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (JwtException | IllegalArgumentException e) {
-            throw new JWTException(e.getMessage());
-        }
+    private Claims getClaimsFromToken(String token,
+                                      SecretKey secretKey) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
 
     }
 
-    public String getUsernameFromToken(String token) {
-        return getClaimsFromToken(token).getSubject();
+    public String getUsernameFromToken(String token,
+                                       SecretKey secretKey) {
+        return getClaimsFromToken(token, secretKey).getSubject();
     }
 
-    public List<String> getAuthoritiesFromToken(String token) {
-        Claims claims = getClaimsFromToken(token);
+    public List<String> getAuthoritiesFromToken(String token,
+                                                SecretKey secretKey) {
+        Claims claims = getClaimsFromToken(token, secretKey);
         return claims.get("ath", List.class);
     }
 
-    public TokenType getTokenTypeFromToken(String token) {
-        Claims claims = getClaimsFromToken(token);
+    public TokenType getTokenTypeFromToken(String token,
+                                           SecretKey secretKey) {
+        Claims claims = getClaimsFromToken(token, secretKey);
         return TokenType.valueOf((String) claims.get("type"));
     }
 
-
+    public Long getUserIdFromToken(String token,
+                                   SecretKey secretKey) {
+        Claims claims = getClaimsFromToken(token, secretKey);
+        return claims.get("sid", Long.class);
+    }
 
 
 

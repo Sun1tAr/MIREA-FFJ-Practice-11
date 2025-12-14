@@ -5,8 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import my.learn.mireaffjpractice11.model.UserRole;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.List;
 
@@ -14,23 +12,30 @@ import java.util.List;
 @Data
 @Table(name = "users")
 @NoArgsConstructor @AllArgsConstructor @Builder
-public class User implements UserDetails {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
-    private String username;
+    @Column
+    private String firstName;
 
     @Column
-    private String password;
+    private String lastName;
 
     @OneToMany(mappedBy = "user")
     private List<Note> notes;
 
-    @Column
-    @Enumerated(EnumType.STRING)
-    private List<UserRole> authorities;
 
+    @OneToOne
+    @JoinColumn(name = "user_auth_id")
+    private UserAuth auth;
+
+    public static User getDefault() {
+        return User.builder()
+                .firstName("Enter your name")
+                .lastName("Enter your last name")
+                .build();
+    }
 }

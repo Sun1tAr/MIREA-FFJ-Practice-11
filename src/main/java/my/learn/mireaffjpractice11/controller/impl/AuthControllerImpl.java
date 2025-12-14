@@ -1,0 +1,41 @@
+package my.learn.mireaffjpractice11.controller.impl;
+
+import lombok.RequiredArgsConstructor;
+import my.learn.mireaffjpractice11.DTO.request.LoginUserRequest;
+import my.learn.mireaffjpractice11.DTO.request.RefreshTokenRequest;
+import my.learn.mireaffjpractice11.DTO.request.RegisterUserRequest;
+import my.learn.mireaffjpractice11.DTO.response.AuthResponse;
+import my.learn.mireaffjpractice11.controller.AuthController;
+import my.learn.mireaffjpractice11.service.AuthService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+
+
+@RestController("/auth")
+@RequiredArgsConstructor
+public class AuthControllerImpl implements AuthController {
+
+    private final AuthService authService;
+
+
+    @Override
+    public ResponseEntity<AuthResponse> registerUser(RegisterUserRequest req) {
+        return new ResponseEntity<>(authService.registerUser(req), HttpStatus.CREATED);
+    }
+
+    @Override
+    public ResponseEntity<AuthResponse> loginUser(LoginUserRequest req) {
+        return new ResponseEntity<>(authService.loginUser(req), HttpStatus.OK);
+    }
+
+    @Override
+    public ResponseEntity<AuthResponse> logoutUser() {
+        return new ResponseEntity<>(authService.logoutUser(), HttpStatus.OK);
+    }
+
+    @Override
+    public ResponseEntity<AuthResponse> refreshToken(RefreshTokenRequest req) {
+        return new ResponseEntity<>(authService.refreshExpiredAccessToken(req), HttpStatus.OK);
+    }
+}
