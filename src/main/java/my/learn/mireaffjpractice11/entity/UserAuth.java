@@ -33,8 +33,8 @@ public class UserAuth implements UserDetails {
     @Enumerated(EnumType.STRING)
     private List<UserRole> authorities;
 
-    @OneToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
 

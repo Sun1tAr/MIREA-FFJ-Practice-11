@@ -24,7 +24,7 @@ public class JWTServiceImpl implements JWTService {
     private final JwtConfig  jwtConfig;
     private final SecretKey secretKey;
     private final RedisTemplate<Long, String> redisTemplate;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder; //todo matches
 
 
     @Override

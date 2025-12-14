@@ -24,12 +24,11 @@ public class User {
     @Column
     private String lastName;
 
-    @OneToMany(mappedBy = "user")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Note> notes;
 
 
-    @OneToOne
-    @JoinColumn(name = "user_auth_id")
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserAuth auth;
 
     public static User getDefault() {

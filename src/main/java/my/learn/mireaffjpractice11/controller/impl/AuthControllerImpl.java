@@ -9,10 +9,12 @@ import my.learn.mireaffjpractice11.controller.AuthController;
 import my.learn.mireaffjpractice11.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 
-@RestController("/auth")
+@RestController
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthControllerImpl implements AuthController {
 

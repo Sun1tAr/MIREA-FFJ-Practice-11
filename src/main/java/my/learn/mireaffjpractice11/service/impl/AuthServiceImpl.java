@@ -15,6 +15,7 @@ import my.learn.mireaffjpractice11.model.UserRole;
 import my.learn.mireaffjpractice11.repository.AuthRepository;
 import my.learn.mireaffjpractice11.service.AuthService;
 import my.learn.mireaffjpractice11.service.JWTService;
+import my.learn.mireaffjpractice11.service.UserService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,13 +31,17 @@ import java.util.List;
 public class AuthServiceImpl implements AuthService {
 
     private final AuthRepository authRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder; //todo matches
     private final JWTService jwtService;
+    private final UserService userService;
 
     @Override
     public AuthResponse registerUser(RegisterUserRequest req) {
+
+        User user = userService.save(User.getDefault());
+
         UserAuth userAuth = UserAuth.builder()
-                .user(User.getDefault())
+                .user(user)
                 .authorities(List.of(UserRole.USER))
                 .username(req.getEmail())
                 .password(passwordEncoder.encode(req.getPassword()))

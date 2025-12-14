@@ -1,0 +1,726 @@
+# Практическое занятие №11: JWT Токены в REST API для управления заметками
+
+## Выполнил: Туев Д. ЭФМО-01-25
+
+## Описание проекта
+
+REST API сервис для управления заметками пользователя с интеграцией JWT (JSON Web Tokens) для аутентификации и авторизации. Система реализует полный цикл управления заметками (CRUD операции) с защитой через Bearer token. Пользователи могут регистрироваться, логиниться, получать access и refresh токены, и управлять своими заметками. Архитектура предусматривает хранение refresh token в Redis с TTL, что позволяет контролировать жизненный цикл сессии.
+
+## Стек технологий
+
+В проекте используются следующие технологии и инструменты:
+- **Spring Boot 3.5.7** — основной фреймворк приложения
+- **Spring Web** — для разработки REST API
+- **Spring Security** — управление аутентификацией и авторизацией
+- **Spring Data JPA** — интеграция с PostgreSQL через Hibernate
+- **Spring Data Redis** — хранилище refresh token с TTL
+- **Spring Validation** — валидация входных данных
+- **PostgreSQL** — реляционная база данных для пользователей и заметок
+- **Redis** — in-memory хранилище для refresh токенов
+- **JJWT 0.12.3** — библиотека для работы с JWT токенами
+- **BCrypt** — хеширование паролей
+- **H2 Database** — встроенная БД для тестирования
+- **Lombok** — сокращение шаблонного кода
+- **Maven** — управление зависимостями и сборка проекта
+- **Java 17** — язык программирования
+
+## Поддерживаемые запросы
+
+**Легенда:** 🔓 Открытый доступ · 🔒 Требуется ACCESS token · 🛡️ Только USER/ADMIN
+
+### API v1 (Authentication & Notes Management)
+
+| Метод | Эндпоинт | Параметры | Действие | Ответ | Требования | Тело ответа |
+|-------|----------|-----------|----------|-------|-----------|-------------|
+| 🔓 **POST** | `/auth/register` | - | Регистрация пользователя | `201 CREATED` | Нет | `AuthResponse` с ACCESS и REFRESH token |
+| 🔓 **POST** | `/auth/login` | - | Вход в систему | `200 OK` | Нет | `AuthResponse` с ACCESS и REFRESH token |
+| 🔒 **POST** | `/auth/logout` | - | Выход из системы | `200 OK` | ACCESS token | `AuthResponse` |
+| 🔓 **POST** | `/auth/refresh` | - | Обновить ACCESS token | `200 OK` | REFRESH token в теле | `AuthResponse` (новые токены) |
+| 🔓 **GET** | `/api/v1/notes/health` | - | Проверка здоровья сервера | `200 OK` | Нет | `{"status":"ok"}` |
+| 🔒 **POST** | `/api/v1/notes/` | - | Создать заметку | `201 CREATED` | ACCESS token | `NoteDTO` |
+| 🔒 **GET** | `/api/v1/notes/` | - | Получить все заметки | `200 OK` | ACCESS token | Список `NoteDTO` |
+| 🔒 **GET** | `/api/v1/notes/{id}` | `id` | Получить заметку по ID | `200 OK` | ACCESS token | `NoteDTO` |
+| 🔒 **PUT** | `/api/v1/notes/{id}` | `id` | Заменить заметку полностью | `200 OK` | ACCESS token | `NoteDTO` |
+| 🔒 **PATCH** | `/api/v1/notes/{id}` | `id` | Частично обновить заметку | `200 OK` | ACCESS token | `NoteDTO` |
+| 🔒 **DELETE** | `/api/v1/notes/{id}` | `id` | Удалить заметку | `200 OK` | ACCESS token | - |
+
+## Формат данных
+
+### Тело запроса (POST /auth/register, POST /auth/login)
+
+```json
+{
+  "email": "user@example.com",
+  "password": "securePassword123"
+}
+```
+
+### Тело запроса (POST /api/v1/notes/)
+
+```json
+{
+  "title": "My First Note",
+  "content": "This is my first note content"
+}
+```
+
+### Тело запроса (PUT /api/v1/notes/{id})
+
+```json
+{
+  "title": "Updated Title",
+  "content": "Updated content here"
+}
+```
+
+### Тело запроса (PATCH /api/v1/notes/{id})
+
+```json
+{
+  "fields": {
+    "title": "Only Title Updated",
+    "content": "Or only content"
+  }
+}
+```
+
+### Тело запроса (POST /auth/refresh)
+
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Ответ (POST /auth/register, POST /auth/login, POST /auth/refresh)
+
+```json
+{
+  "tokens": [
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "tokenType": "ACCESS_BEARER",
+      "issuedAt": "2025-12-14T20:15:00Z",
+      "expiresAt": "2025-12-14T21:15:00Z"
+    },
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "tokenType": "REFRESH_BEARER",
+      "issuedAt": "2025-12-14T20:15:00Z",
+      "expiresAt": "2026-01-13T20:15:00Z"
+    }
+  ]
+}
+```
+
+### Ответ (POST /api/v1/notes/, GET /api/v1/notes/{id}, PUT /api/v1/notes/{id}, PATCH /api/v1/notes/{id})
+
+```json
+{
+  "id": 1,
+  "title": "My First Note",
+  "content": "This is my first note content",
+  "createdAt": "2025-12-14T20:15:00Z",
+  "updatedAt": "2025-12-14T20:15:00Z"
+}
+```
+
+### Ответ (GET /api/v1/notes/)
+
+```json
+[
+  {
+    "id": 1,
+    "title": "First Note",
+    "content": "Content 1",
+    "createdAt": "2025-12-14T20:10:00Z",
+    "updatedAt": "2025-12-14T20:10:00Z"
+  },
+  {
+    "id": 2,
+    "title": "Second Note",
+    "content": "Content 2",
+    "createdAt": "2025-12-14T20:12:00Z",
+    "updatedAt": "2025-12-14T20:12:00Z"
+  }
+]
+```
+
+### Заголовок (для защищённых эндпоинтов)
+
+```
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+## Структура проекта
+
+```
+my/learn/mireaffjpractice11/
+├── config/
+│   ├── EncodingConfig.java                     # Конфигурация BCrypt для хеширования паролей
+│   ├── JwtConfig.java                          # Конфигурация JWT (secret, lifetime)
+│   ├── RedisConfig.java                        # Конфигурация Redis подключения
+│   └── SecurityConfig.java                     # Конфигурация Spring Security
+├── controller/
+│   ├── AuthController.java                     # Interface для аутентификации
+│   ├── HealthController.java                   # Interface для health check
+│   ├── NoteController.java                     # Interface для заметок
+│   ├── filter/
+│   │   └── JwtRequestFilter.java               # Фильтр для валидации JWT токенов
+│   └── impl/
+│       ├── AuthControllerImpl.java              # Реализация аутентификации
+│       └── NoteControllerImplV1.java           # Реализация заметок v1
+├── DTO/
+│   ├── request/
+│   │   ├── CreateNoteRequest.java              # DTO для создания заметки
+│   │   ├── LoginUserRequest.java               # DTO для логина
+│   │   ├── PatchNoteRequest.java               # DTO для PATCH операции
+│   │   ├── PutNoteRequest.java                 # DTO для PUT операции
+│   │   ├── RefreshTokenRequest.java            # DTO для refresh token
+│   │   └── RegisterUserRequest.java            # DTO для регистрации
+│   ├── response/
+│   │   ├── AuthResponse.java                   # DTO ответа аутентификации
+│   │   ├── NoteDTO.java                        # DTO заметки
+│   │   └── ServerStatusResponse.java           # DTO статуса сервера
+│   └── service/
+│       └── JWTokenOwner.java                   # DTO для информации из JWT
+├── entity/
+│   ├── Note.java                               # JPA Entity заметки
+│   ├── User.java                               # JPA Entity пользователя
+│   └── UserAuth.java                           # JPA Entity аутентификации (UserDetails)
+├── exception/
+│   ├── AppException.java                       # Базовое исключение
+│   ├── ConflictException.java                  # 409 Conflict
+│   ├── InternalServerException.java            # 500 Internal Server Error
+│   ├── JWTException.java                       # 401 JWT errors
+│   ├── NotFoundException.java                  # 404 Not Found
+│   ├── RawAppException.java                    # Универсальное исключение
+│   ├── UnauthorizedException.java              # 401 Unauthorized
+│   └── handler/
+│       └── GeneralExceptionHandler.java        # Глобальный обработчик ошибок
+├── model/
+│   ├── JWToken.java                            # POJO токена с метаданными
+│   ├── TokenType.java                          # Enum: ACCESS_BEARER или REFRESH_BEARER
+│   └── UserRole.java                           # Enum ролей (USER, ADMIN)
+├── repository/
+│   ├── AuthRepository.java                     # JPA репозиторий для UserAuth
+│   └── NoteRepository.java                     # JPA репозиторий для Note
+├── service/
+│   ├── AuthService.java                        # Interface сервиса аутентификации
+│   ├── JWTService.java                         # Interface сервиса JWT
+│   ├── NoteService.java                        # Interface сервиса заметок
+│   └── impl/
+│       ├── AuthServiceImpl.java                 # Реализация аутентификации
+│       ├── JWTServiceImpl.java                  # Реализация JWT (генерирование, верификация)
+│       └── NoteServiceV1Impl.java              # Реализация заметок
+├── util/
+│   ├── JwtUtils.java                           # Утилиты для работы с JWT (создание, парсинг)
+│   └── NoteMapper.java                         # Маппер Note → NoteDTO
+└── MireaFfjPractice11Application.java          # Главный класс приложения
+```
+
+## Тестирование
+
+Для тестирования рекомендуется использовать [Postman коллекцию](https://www.postman.com/collections)
+
+### Обработка ошибок и коды ответа
+
+| Код | Название | Где обрабатывается | Что значит / когда возвращается |
+| :-- | :-- | :-- | :-- |
+| 200 | OK | Все успешные операции | Успешная операция. |
+| 201 | Created | `/auth/register`, `/api/v1/notes/` | Ресурс успешно создан. |
+| 400 | Bad Request | `/auth/register`, `/auth/login`, `/api/v1/notes/*` | Некорректные данные (email, пароль < 5 символов, пустое поле). |
+| 401 | Unauthorized | Защищённые эндпоинты, невалидный JWT | Неверные учётные данные или отсутствует/невалидный token. |
+| 404 | Not Found | `/api/v1/notes/{id}` | Заметка не найдена. |
+| 409 | Conflict | `/auth/register`, `/api/v1/notes/*` | Email уже зарегистрирован или ошибка конфликта. |
+| 500 | Internal Server Error | `GeneralExceptionHandler` | Непредвиденная ошибка сервера. |
+
+### Тест кейсы
+
+| № | Наименование | Маршрут | Запрос (пример) | Ожидаемый ответ |
+|--|--|--|--|--|
+| 1 | Регистрация нового пользователя | **POST /auth/register** | `{"email":"john@example.com","password":"Pass123"}` | 201 Created + ACCESS и REFRESH token |
+| 2 | Вход в систему | **POST /auth/login** | `{"email":"john@example.com","password":"Pass123"}` | 200 OK + ACCESS и REFRESH token |
+| 3 | Создание заметки | **POST /api/v1/notes/** | `{"title":"My Note","content":"Content"}` + Header: Bearer token | 201 Created + NoteDTO |
+| 4 | Получить все заметки | **GET /api/v1/notes/** | Header: Bearer token | 200 OK + список NoteDTO |
+| 5 | Получить заметку по ID | **GET /api/v1/notes/1** | Header: Bearer token | 200 OK + NoteDTO |
+| 6 | Полностью обновить заметку (PUT) | **PUT /api/v1/notes/1** | `{"title":"New","content":"New"}` + Header: Bearer token | 200 OK + обновленный NoteDTO |
+| 7 | Частично обновить заметку (PATCH) | **PATCH /api/v1/notes/1** | `{"fields":{"title":"Updated"}}` + Header: Bearer token | 200 OK + обновленный NoteDTO |
+| 8 | Удалить заметку | **DELETE /api/v1/notes/1** | Header: Bearer token | 200 OK |
+| 9 | Обновить ACCESS token через REFRESH | **POST /auth/refresh** | `{"refreshToken":"<REFRESH_TOKEN>"}` | 200 OK + новые ACCESS и REFRESH |
+| 10 | Выход из системы | **POST /auth/logout** | Header: Bearer token | 200 OK |
+| 11 | Health check сервера | **GET /api/v1/notes/health** | - | 200 OK + `{"status":"ok"}` |
+
+### Результаты тестирования
+
+#### 1. Регистрация нового пользователя
+
+![img.png](img.png)
+
+Результат: **HTTP 201 Created**, пользователь зарегистрирован, возвращены ACCESS и REFRESH токены.
+
+#### 2. Вход в систему
+
+XXX
+
+Результат: **HTTP 200 OK**, пользователь аутентифицирован, возвращены ACCESS и REFRESH токены.
+
+#### 3. Создание заметки
+
+XXX
+
+Результат: **HTTP 201 Created**, заметка создана с автоматическим проставлением createdAt и updatedAt.
+
+#### 4. Получить все заметки
+
+XXX
+
+Результат: **HTTP 200 OK**, возвращен список всех заметок пользователя.
+
+#### 5. Получить заметку по ID
+
+XXX
+
+Результат: **HTTP 200 OK**, возвращена информация о конкретной заметке.
+
+#### 6. Полностью обновить заметку (PUT)
+
+XXX
+
+Результат: **HTTP 200 OK**, заметка полностью заменена, обновлены поля, проставлен новый updatedAt.
+
+#### 7. Частично обновить заметку (PATCH)
+
+XXX
+
+Результат: **HTTP 200 OK**, только указанные поля обновлены, остальные остались неизменны.
+
+#### 8. Удалить заметку
+
+XXX
+
+Результат: **HTTP 200 OK**, заметка успешно удалена из БД.
+
+#### 9. Обновить ACCESS token через REFRESH
+
+XXX
+
+Результат: **HTTP 200 OK**, выданы новые ACCESS и REFRESH токены, старый REFRESH удален из Redis.
+
+#### 10. Выход из системы
+
+XXX
+
+Результат: **HTTP 200 OK**, REFRESH token удален из Redis, пользователь разлогинен.
+
+#### 11. Health check сервера
+
+XXX
+
+Результат: **HTTP 200 OK**, сервер отвечает с статусом "ok".
+
+## Настройка сервера
+
+### Переменные окружения
+
+Для корректной работы приложения необходимо указать следующие переменные окружения в файле `application.properties` или через переменные окружения системы:
+
+| Переменная окружения | Описание | Пример |
+|------------|----------|----------|
+| JWT_SECRET | Base64-кодированный секретный ключ для подписи JWT | base64encodedlongsecretkeyfortestingpurposesonlypleasedontusethisinproduction123456 |
+| JWT_ACCESS_LIFETIME | Время жизни ACCESS token в миллисекундах | 3600000 (1 час) |
+| JWT_REFRESH_LIFETIME | Время жизни REFRESH token в миллисекундах | 2592000000 (30 дней) |
+| REDIS_HOST | Хост Redis сервера | localhost |
+| REDIS_PORT | Порт Redis сервера | 6379 |
+| REDIS_PASSWORD | Пароль Redis (если требуется) | password |
+| DB_URL | URL подключения к PostgreSQL | jdbc:postgresql://localhost:5432/practice11_db |
+| DB_USER | Имя пользователя БД | postgres |
+| DB_PASSWORD | Пароль пользователя БД | password |
+
+**Конфигурация в application.properties:**
+```properties
+jwt.secret=${JWT_SECRET}
+jwt.lifetime.access=${JWT_ACCESS_LIFETIME}
+jwt.lifetime.refresh=${JWT_REFRESH_LIFETIME}
+spring.redis.host=${REDIS_HOST}
+spring.redis.port=${REDIS_PORT}
+spring.redis.password=${REDIS_PASSWORD}
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASSWORD}
+```
+
+## Дополнительно
+
+### Теоретические основы
+
+#### JWT (JSON Web Token) структура
+
+JWT состоит из трёх частей, разделённых точками:
+
+```
+header.payload.signature
+```
+
+- **Header** — информация о типе токена и алгоритме подписи (HS256)
+- **Payload** — утверждения (claims) с информацией о пользователе (username, authorities, userId, etc.)
+- **Signature** — криптографическая подпись для верификации целостности
+
+**Пример декодированного JWT:**
+```json
+// Header
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+
+// Payload
+{
+  "sub": "john@example.com",
+  "sid": 1,
+  "iat": 1702576500,
+  "exp": 1702580100,
+  "ath": ["USER"],
+  "type": "ACCESS_BEARER"
+}
+```
+
+#### Access Token vs Refresh Token
+
+- **Access Token** — краткосрочный (1 час), содержит информацию о пользователе и ролях, используется для доступа к защищённым ресурсам
+- **Refresh Token** — долгосрочный (30 дней), хранится в защищённом хранилище (Redis), используется только для получения нового Access Token
+
+**Преимущества разделения:**
+- Безопасность: если Access Token скомпрометирован, он действует ограниченное время
+- Контроль: можно отозвать доступ через удаление Refresh Token из Redis
+- Функциональность: можно реализовать logout, смену пароля с инвалидацией
+
+#### Redis для Refresh Token
+
+Redis используется для хранения Refresh Token с TTL:
+- O(1) доступ — быстрая проверка валидности
+- TTL поддержка — автоматическое удаление устаревших токенов
+- Масштабируемость — поддержка распределённого хранилища
+- Безопасность — отделение от основной БД
+
+#### JwtRequestFilter и Security Context
+
+JwtRequestFilter — фильтр Spring Security, который для каждого запроса:
+1. Извлекает JWT из заголовка `Authorization: Bearer <TOKEN>`
+2. Валидирует подпись и время истечения
+3. Извлекает username и роли из payload
+4. Устанавливает Authentication в SecurityContext
+5. Позволяет дальнейшим фильтрам/контроллерам использовать пользователя
+
+### Ключевые фрагменты кода
+
+#### 1. JwtConfig с конфигурацией параметров
+
+```java
+@Configuration
+public class JwtConfig {
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Getter
+    @Value("${jwt.lifetime.access}")
+    private Duration accessTokenLifetime;
+
+    @Getter
+    @Value("${jwt.lifetime.refresh}")
+    private Duration refreshTokenLifetime;
+
+    @Bean
+    public SecretKey secretKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+}
+```
+
+#### 2. JWTService для генерирования и верификации токенов
+
+```java
+@Service
+@RequiredArgsConstructor
+public class JWTServiceImpl implements JWTService {
+    private final JwtUtils jwtUtils;
+    private final JwtConfig jwtConfig;
+    private final SecretKey secretKey;
+    private final RedisTemplate<Long, String> redisTemplate;
+
+    @Override
+    public JWToken generateAccessTokenFor(UserAuth user) {
+        TokenType type = TokenType.ACCESS_BEARER;
+        Date issuedAt = new Date();
+        Date expiresAt = new Date(issuedAt.getTime() + jwtConfig.getAccessTokenLifetime().toMillis());
+        String payload = jwtUtils.generateToken(user, issuedAt, expiresAt, type, secretKey);
+        return JWToken.builder()
+                .tokenType(type)
+                .token(payload)
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    @Override
+    public JWToken generateRefreshTokenFor(UserAuth user) {
+        TokenType type = TokenType.REFRESH_BEARER;
+        Date issuedAt = new Date();
+        Date expiresAt = new Date(issuedAt.getTime() + jwtConfig.getRefreshTokenLifetime().toMillis());
+        String payload = jwtUtils.generateToken(user, issuedAt, expiresAt, type, secretKey);
+        redisTemplate.opsForValue().set(user.getId(), payload);
+        return JWToken.builder()
+                .tokenType(type)
+                .token(payload)
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    @Override
+    public void deleteRefreshTokenFor(UserAuth userAuth) {
+        redisTemplate.delete(userAuth.getId());
+    }
+}
+```
+
+#### 3. JwtRequestFilter для валидации токенов
+
+```java
+@Component
+@RequiredArgsConstructor
+public class JwtRequestFilter extends OncePerRequestFilter {
+    private final AuthService authService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
+            throws ServletException, IOException {
+        if (!(request.getHeader("Authorization") != null && request.getHeader("Authorization").startsWith("Bearer "))) {
+            filterChain.doFilter(request, response);
+        }
+
+        String token = request.getHeader("Authorization").substring(7);
+
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            Authentication auth;
+            try {
+                auth = authService.createAuthByAccessJwt(token);
+            } catch (Exception e) {
+                response.sendError(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
+                return;
+            }
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+#### 4. JwtUtils для создания и парсинга JWT
+
+```java
+@Component
+public class JwtUtils {
+    public String generateToken(UserAuth userDetails, Date issuedAt, Date expiresAt, TokenType tokenType, SecretKey secretKey) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("iat", issuedAt.getTime());
+        claims.put("exp", expiresAt.getTime());
+        claims.put("ath", userDetails.getAuthorities());
+        claims.put("sid", userDetails.getId());
+        claims.put("type", tokenType.toString());
+
+        return Jwts.builder()
+                .subject(userDetails.getUsername())
+                .claims(claims)
+                .issuedAt(issuedAt)
+                .expiration(expiresAt)
+                .signWith(secretKey)
+                .compact();
+    }
+
+    public String getUsernameFromToken(String token, SecretKey secretKey) {
+        return getClaimsFromToken(token, secretKey).getSubject();
+    }
+
+    public Long getUserIdFromToken(String token, SecretKey secretKey) {
+        Claims claims = getClaimsFromToken(token, secretKey);
+        return claims.get("sid", Long.class);
+    }
+
+    private Claims getClaimsFromToken(String token, SecretKey secretKey) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+}
+```
+
+#### 5. AuthServiceImpl с регистрацией и логином
+
+```java
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+    private final AuthRepository authRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JWTService jwtService;
+
+    @Override
+    public AuthResponse registerUser(RegisterUserRequest req) {
+        UserAuth userAuth = UserAuth.builder()
+                .user(User.getDefault())
+                .authorities(List.of(UserRole.USER))
+                .username(req.getEmail())
+                .password(passwordEncoder.encode(req.getPassword()))
+                .build();
+        UserAuth saved = authRepository.save(userAuth);
+        JWToken accessToken = jwtService.generateAccessTokenFor(saved);
+        JWToken refreshToken = jwtService.generateRefreshTokenFor(saved);
+        return AuthResponse.builder()
+                .tokens(List.of(accessToken, refreshToken))
+                .build();
+    }
+
+    @Override
+    public AuthResponse loginUser(LoginUserRequest req) {
+        UserAuth userAuth = loadUserByUsername(req.getEmail());
+        if (!passwordEncoder.matches(req.getPassword(), userAuth.getPassword())) {
+            throw new UnauthorizedException("Invalid username or password");
+        }
+        JWToken accessToken = jwtService.generateAccessTokenFor(userAuth);
+        JWToken refreshToken = jwtService.generateRefreshTokenFor(userAuth);
+        return AuthResponse.builder()
+                .tokens(List.of(accessToken, refreshToken))
+                .build();
+    }
+}
+```
+
+#### 6. NoteControllerImplV1 для управления заметками
+
+```java
+@RestController
+@RequestMapping("/api/v1/notes")
+@RequiredArgsConstructor
+public class NoteControllerImplV1 implements NoteController {
+    private final NoteService noteService;
+    private final NoteMapper mapper;
+
+    @Override
+    public ResponseEntity<NoteDTO> addNote(CreateNoteRequest createNoteRequest) {
+        NoteDTO noteDTO = mapper.toNoteDTO(noteService.addNote(createNoteRequest));
+        return new ResponseEntity<>(noteDTO, HttpStatus.CREATED);
+    }
+
+    @Override
+    public ResponseEntity<List<NoteDTO>> getAllNotes() {
+        List<NoteDTO> list = noteService.getAllNotes().stream()
+                .map(mapper::toNoteDTO)
+                .toList();
+        return new ResponseEntity<>(list, HttpStatus.OK);
+    }
+
+    @Override
+    public ResponseEntity<NoteDTO> getNoteById(Long id) {
+        Note byId = noteService.findById(id);
+        return new ResponseEntity<>(mapper.toNoteDTO(byId), HttpStatus.OK);
+    }
+}
+```
+
+### Контрольные вопросы
+
+#### 1. Зачем использовать JWT вместо session-based аутентификации?
+
+**JWT преимущества:**
+- **Stateless** — сервер не хранит информацию о сессии (масштабируемость)
+- **Масштабируемость** — работает в микросервисной архитектуре с несколькими инстансами
+- **CORS-friendly** — легко передавать через Headers без ограничений same-origin policy
+- **Mobile-friendly** — идеален для мобильных приложений и API
+- **Портативность** — полная информация в токене, нет зависимости от server state
+
+#### 2. Почему REFRESH token хранится в Redis?
+
+**Причины:**
+- **Быстрый доступ** — O(1) для проверки валидности vs O(n) для БД
+- **TTL автоматизация** — Redis автоматически удаляет устаревшие ключи
+- **Контроль доступа** — просто удалить для logout/смены пароля
+- **Безопасность** — отделение от основной БД снижает риск утечки
+
+#### 3. Как реализовать logout с JWT?
+
+**Три способа:**
+
+1. **Blacklist (для ACCESS token)** — хранить "невалидные" токены в Redis
+2. **Refresh Token invalidation (v11)** — удалить REFRESH token из Redis ✓
+3. **Short-lived tokens** — ACCESS быстро истекает, нет необходимости logout
+
+#### 4. Как защитить JWT от XSS атак?
+
+**Меры защиты:**
+- **HttpOnly Cookie** — недоступен JavaScript (защита от XSS)
+- **Secure Cookie** — отправляется только по HTTPS
+- **SameSite Cookie** — защита от CSRF
+- **Short-lived token** — быстрое истечение ограничивает окно уязвимости
+
+#### 5. Как работает PATCH vs PUT?
+
+- **PUT** — Полностью заменяет ресурс (требует все поля)
+- **PATCH** — Частично обновляет ресурс (обновляет только переданные поля)
+
+#### 6. Почему использовать BCrypt вместо MD5/SHA?
+
+**BCrypt преимущества:**
+- **Slow** — специально разработан чтобы быть медленным (защита от brute-force)
+- **Salt** — автоматически добавляет соль (защита от rainbow tables)
+- **Adaptive** — можно увеличить стоимость вычислений с течением времени
+
+#### 7. Как происходит обновление ACCESS token через REFRESH?
+
+```
+1. Client хранит ACCESS и REFRESH токены
+2. ACCESS используется для запросов
+3. ACCESS истекает (401 ошибка)
+4. Client отправляет REFRESH на /auth/refresh
+5. Server проверяет REFRESH в Redis
+6. Server выдает новые ACCESS и REFRESH
+7. Server удаляет старый REFRESH из Redis
+8. Client обновляет свои токены
+```
+
+## Выводы
+
+В результате выполнения практического занятия №11 был разработан полнофункциональный REST API сервис для управления заметками с интеграцией JWT аутентификации и авторизации. Проект демонстрирует production-ready подход к безопасности веб-приложений и управлению жизненным циклом сессий.
+
+**Достигнутые результаты:**
+
+- Реализована двухуровневая аутентификация: ACCESS и REFRESH токены с разными TTL
+- Использован JJWT 0.12.3 для создания и верификации JWT токенов
+- Реализовано хранилище Refresh Token в Redis с автоматическим TTL
+- Создан JwtRequestFilter для валидации токенов в каждом запросе
+- Реализованы операции управления заметками: CREATE, READ, UPDATE (PUT/PATCH), DELETE
+- Реализована функция logout через инвалидацию Refresh Token
+- Пароли хранятся в хешированном виде с использованием BCrypt
+- Реализована обработка ошибок аутентификации (401, 403, 404, 409)
+- Создана полная архитектура с Service, Repository, Controller, Filter, Exception layers
+- Interface-based архитектура для контроллеров (AuthController, NoteController)
+
+**Приобретённые навыки:**
+
+- Работа с JWT токенами и JJWT библиотекой 0.12.3
+- Реализация Access/Refresh Token механизма с разными lifetime
+- Интеграция с Redis для долгосрочного хранения данных
+- Создание custom Spring Security фильтров (JwtRequestFilter)
+- Использование UserDetails и Authentication в SecurityContext
+- Безопасное хранение паролей с BCrypt хешированием
+- CRUD операции с JPA Entity (Note, User, UserAuth)
+- Валидация входных данных с Jakarta Validation
+- Проектирование REST API с правильными HTTP статусами
+- Обработка исключений и глобальная обработка ошибок
+
+Проект готов к дальнейшему расширению функциональности (добавление двухфакторной аутентификации через OTP, социальная аутентификация, шифрование sensitive данных, логирование аудита и т.д.).

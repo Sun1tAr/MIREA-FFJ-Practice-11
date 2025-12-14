@@ -31,7 +31,7 @@ public class Note {
     @Column
     private LocalDateTime updatedAt;
 
-    @ManyToOne(fetch =  FetchType.LAZY,  cascade = CascadeType.ALL)
-    @JoinColumn(name = "user_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 }
