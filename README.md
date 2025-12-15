@@ -255,67 +255,67 @@ my/learn/mireaffjpractice11/
 
 #### 1. Регистрация нового пользователя
 
-![img.png](img.png)
+![img.png](about/img.png)
 
 Результат: **HTTP 201 Created**, пользователь зарегистрирован, возвращены ACCESS и REFRESH токены.
 
 #### 2. Вход в систему
 
-XXX
+![img_1.png](about/img_1.png)
 
 Результат: **HTTP 200 OK**, пользователь аутентифицирован, возвращены ACCESS и REFRESH токены.
 
 #### 3. Создание заметки
 
-XXX
+![img_2.png](about/img_2.png)
 
 Результат: **HTTP 201 Created**, заметка создана с автоматическим проставлением createdAt и updatedAt.
 
 #### 4. Получить все заметки
 
-XXX
+![img_3.png](about/img_3.png)
 
 Результат: **HTTP 200 OK**, возвращен список всех заметок пользователя.
 
 #### 5. Получить заметку по ID
 
-XXX
+![img_4.png](about/img_4.png)
 
 Результат: **HTTP 200 OK**, возвращена информация о конкретной заметке.
 
 #### 6. Полностью обновить заметку (PUT)
 
-XXX
+![img_5.png](about/img_5.png)
 
 Результат: **HTTP 200 OK**, заметка полностью заменена, обновлены поля, проставлен новый updatedAt.
 
 #### 7. Частично обновить заметку (PATCH)
 
-XXX
+![img_6.png](about/img_6.png)
 
 Результат: **HTTP 200 OK**, только указанные поля обновлены, остальные остались неизменны.
 
 #### 8. Удалить заметку
 
-XXX
+![img_7.png](about/img_7.png)
 
 Результат: **HTTP 200 OK**, заметка успешно удалена из БД.
 
 #### 9. Обновить ACCESS token через REFRESH
 
-XXX
+![img_8.png](about/img_8.png)
 
 Результат: **HTTP 200 OK**, выданы новые ACCESS и REFRESH токены, старый REFRESH удален из Redis.
 
 #### 10. Выход из системы
 
-XXX
+![img_9.png](about/img_9.png)
 
 Результат: **HTTP 200 OK**, REFRESH token удален из Redis, пользователь разлогинен.
 
 #### 11. Health check сервера
 
-XXX
+![img_10.png](about/img_10.png)
 
 Результат: **HTTP 200 OK**, сервер отвечает с статусом "ok".
 
@@ -327,9 +327,6 @@ XXX
 
 | Переменная окружения | Описание | Пример |
 |------------|----------|----------|
-| JWT_SECRET | Base64-кодированный секретный ключ для подписи JWT | base64encodedlongsecretkeyfortestingpurposesonlypleasedontusethisinproduction123456 |
-| JWT_ACCESS_LIFETIME | Время жизни ACCESS token в миллисекундах | 3600000 (1 час) |
-| JWT_REFRESH_LIFETIME | Время жизни REFRESH token в миллисекундах | 2592000000 (30 дней) |
 | REDIS_HOST | Хост Redis сервера | localhost |
 | REDIS_PORT | Порт Redis сервера | 6379 |
 | REDIS_PASSWORD | Пароль Redis (если требуется) | password |
@@ -339,9 +336,6 @@ XXX
 
 **Конфигурация в application.properties:**
 ```properties
-jwt.secret=${JWT_SECRET}
-jwt.lifetime.access=${JWT_ACCESS_LIFETIME}
-jwt.lifetime.refresh=${JWT_REFRESH_LIFETIME}
 spring.redis.host=${REDIS_HOST}
 spring.redis.port=${REDIS_PORT}
 spring.redis.password=${REDIS_PASSWORD}
@@ -411,227 +405,6 @@ JwtRequestFilter — фильтр Spring Security, который для каж�
 3. Извлекает username и роли из payload
 4. Устанавливает Authentication в SecurityContext
 5. Позволяет дальнейшим фильтрам/контроллерам использовать пользователя
-
-### Ключевые фрагменты кода
-
-#### 1. JwtConfig с конфигурацией параметров
-
-```java
-@Configuration
-public class JwtConfig {
-    @Value("${jwt.secret}")
-    private String secret;
-
-    @Getter
-    @Value("${jwt.lifetime.access}")
-    private Duration accessTokenLifetime;
-
-    @Getter
-    @Value("${jwt.lifetime.refresh}")
-    private Duration refreshTokenLifetime;
-
-    @Bean
-    public SecretKey secretKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-}
-```
-
-#### 2. JWTService для генерирования и верификации токенов
-
-```java
-@Service
-@RequiredArgsConstructor
-public class JWTServiceImpl implements JWTService {
-    private final JwtUtils jwtUtils;
-    private final JwtConfig jwtConfig;
-    private final SecretKey secretKey;
-    private final RedisTemplate<Long, String> redisTemplate;
-
-    @Override
-    public JWToken generateAccessTokenFor(UserAuth user) {
-        TokenType type = TokenType.ACCESS_BEARER;
-        Date issuedAt = new Date();
-        Date expiresAt = new Date(issuedAt.getTime() + jwtConfig.getAccessTokenLifetime().toMillis());
-        String payload = jwtUtils.generateToken(user, issuedAt, expiresAt, type, secretKey);
-        return JWToken.builder()
-                .tokenType(type)
-                .token(payload)
-                .issuedAt(issuedAt)
-                .expiresAt(expiresAt)
-                .build();
-    }
-
-    @Override
-    public JWToken generateRefreshTokenFor(UserAuth user) {
-        TokenType type = TokenType.REFRESH_BEARER;
-        Date issuedAt = new Date();
-        Date expiresAt = new Date(issuedAt.getTime() + jwtConfig.getRefreshTokenLifetime().toMillis());
-        String payload = jwtUtils.generateToken(user, issuedAt, expiresAt, type, secretKey);
-        redisTemplate.opsForValue().set(user.getId(), payload);
-        return JWToken.builder()
-                .tokenType(type)
-                .token(payload)
-                .issuedAt(issuedAt)
-                .expiresAt(expiresAt)
-                .build();
-    }
-
-    @Override
-    public void deleteRefreshTokenFor(UserAuth userAuth) {
-        redisTemplate.delete(userAuth.getId());
-    }
-}
-```
-
-#### 3. JwtRequestFilter для валидации токенов
-
-```java
-@Component
-@RequiredArgsConstructor
-public class JwtRequestFilter extends OncePerRequestFilter {
-    private final AuthService authService;
-
-    @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
-            throws ServletException, IOException {
-        if (!(request.getHeader("Authorization") != null && request.getHeader("Authorization").startsWith("Bearer "))) {
-            filterChain.doFilter(request, response);
-        }
-
-        String token = request.getHeader("Authorization").substring(7);
-
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            Authentication auth;
-            try {
-                auth = authService.createAuthByAccessJwt(token);
-            } catch (Exception e) {
-                response.sendError(HttpStatus.UNAUTHORIZED.value(), e.getMessage());
-                return;
-            }
-            SecurityContextHolder.getContext().setAuthentication(auth);
-        }
-
-        filterChain.doFilter(request, response);
-    }
-}
-```
-
-#### 4. JwtUtils для создания и парсинга JWT
-
-```java
-@Component
-public class JwtUtils {
-    public String generateToken(UserAuth userDetails, Date issuedAt, Date expiresAt, TokenType tokenType, SecretKey secretKey) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("iat", issuedAt.getTime());
-        claims.put("exp", expiresAt.getTime());
-        claims.put("ath", userDetails.getAuthorities());
-        claims.put("sid", userDetails.getId());
-        claims.put("type", tokenType.toString());
-
-        return Jwts.builder()
-                .subject(userDetails.getUsername())
-                .claims(claims)
-                .issuedAt(issuedAt)
-                .expiration(expiresAt)
-                .signWith(secretKey)
-                .compact();
-    }
-
-    public String getUsernameFromToken(String token, SecretKey secretKey) {
-        return getClaimsFromToken(token, secretKey).getSubject();
-    }
-
-    public Long getUserIdFromToken(String token, SecretKey secretKey) {
-        Claims claims = getClaimsFromToken(token, secretKey);
-        return claims.get("sid", Long.class);
-    }
-
-    private Claims getClaimsFromToken(String token, SecretKey secretKey) {
-        return Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-}
-```
-
-#### 5. AuthServiceImpl с регистрацией и логином
-
-```java
-@Service
-@Transactional
-@RequiredArgsConstructor
-public class AuthServiceImpl implements AuthService {
-    private final AuthRepository authRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JWTService jwtService;
-
-    @Override
-    public AuthResponse registerUser(RegisterUserRequest req) {
-        UserAuth userAuth = UserAuth.builder()
-                .user(User.getDefault())
-                .authorities(List.of(UserRole.USER))
-                .username(req.getEmail())
-                .password(passwordEncoder.encode(req.getPassword()))
-                .build();
-        UserAuth saved = authRepository.save(userAuth);
-        JWToken accessToken = jwtService.generateAccessTokenFor(saved);
-        JWToken refreshToken = jwtService.generateRefreshTokenFor(saved);
-        return AuthResponse.builder()
-                .tokens(List.of(accessToken, refreshToken))
-                .build();
-    }
-
-    @Override
-    public AuthResponse loginUser(LoginUserRequest req) {
-        UserAuth userAuth = loadUserByUsername(req.getEmail());
-        if (!passwordEncoder.matches(req.getPassword(), userAuth.getPassword())) {
-            throw new UnauthorizedException("Invalid username or password");
-        }
-        JWToken accessToken = jwtService.generateAccessTokenFor(userAuth);
-        JWToken refreshToken = jwtService.generateRefreshTokenFor(userAuth);
-        return AuthResponse.builder()
-                .tokens(List.of(accessToken, refreshToken))
-                .build();
-    }
-}
-```
-
-#### 6. NoteControllerImplV1 для управления заметками
-
-```java
-@RestController
-@RequestMapping("/api/v1/notes")
-@RequiredArgsConstructor
-public class NoteControllerImplV1 implements NoteController {
-    private final NoteService noteService;
-    private final NoteMapper mapper;
-
-    @Override
-    public ResponseEntity<NoteDTO> addNote(CreateNoteRequest createNoteRequest) {
-        NoteDTO noteDTO = mapper.toNoteDTO(noteService.addNote(createNoteRequest));
-        return new ResponseEntity<>(noteDTO, HttpStatus.CREATED);
-    }
-
-    @Override
-    public ResponseEntity<List<NoteDTO>> getAllNotes() {
-        List<NoteDTO> list = noteService.getAllNotes().stream()
-                .map(mapper::toNoteDTO)
-                .toList();
-        return new ResponseEntity<>(list, HttpStatus.OK);
-    }
-
-    @Override
-    public ResponseEntity<NoteDTO> getNoteById(Long id) {
-        Note byId = noteService.findById(id);
-        return new ResponseEntity<>(mapper.toNoteDTO(byId), HttpStatus.OK);
-    }
-}
-```
 
 ### Контрольные вопросы
 
@@ -722,5 +495,3 @@ public class NoteControllerImplV1 implements NoteController {
 - Валидация входных данных с Jakarta Validation
 - Проектирование REST API с правильными HTTP статусами
 - Обработка исключений и глобальная обработка ошибок
-
-Проект готов к дальнейшему расширению функциональности (добавление двухфакторной аутентификации через OTP, социальная аутентификация, шифрование sensitive данных, логирование аудита и т.д.).

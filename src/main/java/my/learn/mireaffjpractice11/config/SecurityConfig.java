@@ -37,10 +37,10 @@ public class SecurityConfig {
                 .cors(c -> c.disable())
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/notes/health").permitAll()
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/auth./logout").authenticated()
+                        .requestMatchers("/auth/logout").authenticated()
                         .requestMatchers("/api/v1/notes/**").authenticated()
-                        .requestMatchers("api/v1/notes/health").permitAll()
                 )
 
 

@@ -59,11 +59,10 @@ public class NoteServiceV1Impl  implements NoteService {
     public Note putNote(PutNoteRequest req, Long id) {
         Note note = findById(id);
         
-        note = Note.builder()
-                .title(req.getTitle())
-                .content(req.getContent())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        note.setContent(req.getContent());
+        note.setUpdatedAt(LocalDateTime.now());
+        note.setTitle(req.getTitle());
+
         try {
             return noteRepository.save(note);
         } catch (Exception e) {

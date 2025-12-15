@@ -31,7 +31,7 @@ import java.util.List;
 public class AuthServiceImpl implements AuthService {
 
     private final AuthRepository authRepository;
-    private final PasswordEncoder passwordEncoder; //todo matches
+    private final PasswordEncoder passwordEncoder;
     private final JWTService jwtService;
     private final UserService userService;
 
@@ -58,9 +58,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse loginUser(LoginUserRequest req) {
         UserAuth userAuth = loadUserByUsername(req.getEmail());
-        if (!userAuth.getPassword().equals(passwordEncoder.encode(req.getPassword()))) {
+
+        if (!passwordEncoder.matches(req.getPassword(), userAuth.getPassword())) {
             throw new UnauthorizedException("Invalid username or password");
         }
+
         JWToken accessToken = jwtService.generateAccessTokenFor(userAuth);
         JWToken refreshToken = jwtService.generateRefreshTokenFor(userAuth);
         return  AuthResponse.builder()

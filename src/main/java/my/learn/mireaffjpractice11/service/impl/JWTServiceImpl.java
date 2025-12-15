@@ -24,7 +24,6 @@ public class JWTServiceImpl implements JWTService {
     private final JwtConfig  jwtConfig;
     private final SecretKey secretKey;
     private final RedisTemplate<Long, String> redisTemplate;
-    private final PasswordEncoder passwordEncoder; //todo matches
 
 
     @Override
@@ -84,7 +83,7 @@ public class JWTServiceImpl implements JWTService {
             return false;
         }
         String saved = redisTemplate.opsForValue().get(id);
-        return saved != null && saved.equals(passwordEncoder.encode(refreshToken));
+        return saved != null && saved.equals(refreshToken);
     }
 
     @Override

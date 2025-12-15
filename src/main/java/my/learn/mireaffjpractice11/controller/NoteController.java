@@ -13,7 +13,7 @@ import java.util.List;
 public interface NoteController extends HealthController {
 
 
-    @PostMapping("/")
+    @PostMapping
     ResponseEntity<NoteDTO> addNote(@RequestBody @Valid CreateNoteRequest createNoteRequest);
 
     @PatchMapping("/{id}")
@@ -25,7 +25,7 @@ public interface NoteController extends HealthController {
     @DeleteMapping("/{id}")
     ResponseEntity<?> deleteNote(@PathVariable(name = "id") Long id);
 
-    @GetMapping("/")
+    @GetMapping
     ResponseEntity<List<NoteDTO>> getAllNotes();
 
     @GetMapping("/{id}")
