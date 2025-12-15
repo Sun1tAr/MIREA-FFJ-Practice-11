@@ -221,7 +221,7 @@ my/learn/mireaffjpractice11/
 
 ## Тестирование
 
-Для тестирования рекомендуется использовать [Postman коллекцию](https://www.postman.com/collections)
+Для тестирования рекомендуется использовать [Postman коллекцию](https://www.postman.com/lively-flare-564043/workspace/learning/collection/42992055-b1282b40-96e0-4fd9-acce-13b93c2f7677?action=share&creator=42992055)
 
 ### Обработка ошибок и коды ответа
 
